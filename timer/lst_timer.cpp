@@ -130,6 +130,16 @@ void sort_timer_lst::add_timer(util_timer *timer, util_timer *lst_head)
     }
 }
 
+// 定时任务处理函数
+// 使用统一事件源，SIGALRM信号每次被触发，主循环中调用一次定时任务处理函数，处理链表容器中到期的定时器。
+
+// 具体的逻辑如下，
+
+// 遍历定时器升序链表容器，从头结点开始依次处理每个定时器，直到遇到尚未到期的定时器
+
+// 若当前时间小于定时器超时时间，跳出循环，即未找到到期的定时器
+
+// 若当前时间大于定时器超时时间，即找到了到期的定时器，执行回调函数，然后将它从链表中删除，然后继续遍历
 void sort_timer_lst::tick()
 {
     if(!head)
@@ -144,6 +154,7 @@ void sort_timer_lst::tick()
         {
             break;
         }
+        // 定时事件，具体的，从内核事件表删除事件，关闭文件描述符，释放连接资源。
         tmp->cb_func(tmp->user_data);
         head = tmp->next;
         if(head)

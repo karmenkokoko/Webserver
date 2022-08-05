@@ -120,7 +120,7 @@ void threadpool<T>::run()
         m_queuelocker.lock();
         if(m_workqueue.empty())
         {
-            m_workqueue.unlock();
+            m_queuelocker.unlock();
             continue;
         }
         T *request = m_workqueue.front();
@@ -141,7 +141,7 @@ void threadpool<T>::run()
                     request->process();
                 }
                 else{
-                    request->imporv = 1;
+                    request->improv = 1;
                     request->timer_flag = 1;
                 }
             }

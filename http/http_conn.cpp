@@ -613,7 +613,46 @@ bool http_conn::write()
         }
         if(temp <= -1)
         {
-            
+            // 第一种情况 缓冲区满了
+            if(errno == EAGAIN)
+            {
+                //第一个iovec头部信息的数据已发送完，发送第二个iovec数据
+                if(bytes_have_send >= m_iv[0].iov_len)
+                {
+                    m_iv[0].iov_len = 0;
+                    m_iv[1].iov_base = m_file_address + newadd;
+                    m_iv[1].iov_len = bytes_to_send;
+                }
+                else
+                {
+                    m_iv[0].iov_base = m_write_buf + bytes_to_send;
+                    m_iv[0].iov_len = m_iv[0].iov_len - bytes_have_send;
+                }
+                modfd(m_epollfd, m_sockfd, EPOLLIN, m_TRIGMode);
+                return true;
+            }
+            // 如果是发送失败
+            unmap();
+            return false;
+        }
+        bytes_to_send -= temp;
+
+        // 发完
+        if(bytes_to_send <= 0)
+        {
+            unmap();
+            modfd(m_epollfd, m_sockfd, EPOLLIN, m_TRIGMode);
+
+            if(m_linger)
+            {
+                // 如果是长链接 重新初始化http
+                init();
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
     }
 }
@@ -732,6 +771,7 @@ bool http_conn::process_write(HTTP_CODE ret)
             if(!add_content(ok_string))
                 return false;
         }
+
     }
     default:
         return false;
@@ -742,4 +782,22 @@ bool http_conn::process_write(HTTP_CODE ret)
     m_iv_count = 1;
     bytes_to_send = m_write_idx;
     return true;
+}
+
+// 主函数
+void http_conn::process()
+{
+    HTTP_CODE read_ret = process_read();
+    if(read_ret == NO_REQUEST)
+    {
+        modfd(m_epollfd, m_sockfd, EPOLLIN, m_TRIGMode);
+        return;
+    }
+    // 请求报文的状态码输入process write
+    bool write_ret = process_write(read_ret);
+    if(!write_ret)
+    {
+        close_conn();
+    }
+    modfd(m_epollfd, m_sockfd, EPOLLOUT, m_TRIGMode);
 }
